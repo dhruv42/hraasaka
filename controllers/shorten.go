@@ -6,8 +6,10 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"strconv"
 	"time"
 
+	"github.com/dhruv42/hraasaka/cache"
 	"github.com/dhruv42/hraasaka/config"
 	"github.com/dhruv42/hraasaka/db"
 	"github.com/dhruv42/hraasaka/enums"
@@ -51,8 +53,12 @@ func ShortenUrl(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Fatalf("Db connectiom failed:- %v", err)
 	}
-
 	defer client.Disconnect(ctx)
+
+	cache, err := cache.ConnectCache()
+	if err != nil {
+		log.Fatalf("Cache connectiom failed:- %v", err)
+	}
 
 	body, err := ioutil.ReadAll(r.Body)
 	if err != nil {
@@ -66,7 +72,19 @@ func ShortenUrl(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	hash := helpers.Base62Encode(int(helpers.GetCounter()))
+	// Get counter from cache and update
+
+	counter, err := cache.Get("counter").Result()
+	if err != nil {
+		log.Fatalf("Failed to set counter in cache:- %v", err)
+	}
+
+	counterInt, err := strconv.Atoi(counter)
+	if err != nil {
+		log.Fatalf("Failed to convert counter string into int:- %v", err)
+	}
+
+	hash := helpers.Base62Encode(counterInt)
 
 	insertDoc := &models.Link{
 		Url:       shortenReq.Url,
@@ -81,6 +99,8 @@ func ShortenUrl(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		generateResponse(w, "INTERNAL_SERVER_ERROR", http.StatusInternalServerError, nil)
 	}
+
+	_ = cache.Incr("counter")
 
 	finalResponse := &ResponseShortenLink{
 		CreatedAt: insertDoc.CreatedAt,

@@ -8,9 +8,10 @@ import (
 )
 
 type Config struct {
-	Port   int
-	DbUrl  string
-	DbName string
+	Port     int
+	DbUrl    string
+	DbName   string
+	CacheUrl string
 }
 
 func GetConfig() (*Config, error) {

@@ -5,6 +5,7 @@ import (
 	"log"
 
 	"github.com/dhruv42/hraasaka/config"
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/mongo/readpref"
@@ -37,29 +38,23 @@ func GetDBConnection(ctx context.Context, cfg *config.Config) (*mongo.Client, er
 	return client, nil
 }
 
-func InitDb(url string) *mongo.Client {
-	client, err := mongo.NewClient(options.Client().ApplyURI(url))
-	if err != nil {
-		log.Fatalf("Cou")
-		panic(err)
+func CreateIndexOnHash(ctx context.Context, cfg *config.Config, client *mongo.Client) error {
+	col := client.Database(cfg.DbName).Collection("links")
+
+	options := options.Index().SetUnique(true)
+	mod := mongo.IndexModel{
+		Keys: bson.M{
+			"hash": 1,
+		},
+		Options: options,
 	}
 
-	return client
-}
-
-func (c *Client) Connect(ctx context.Context) error {
-	err := c.Conn.Connect(ctx)
+	idx, err := col.Indexes().CreateOne(ctx, mod)
 	if err != nil {
-		panic(err)
+		return err
 	}
-	err = c.Conn.Ping(ctx, readpref.Primary())
-	if err != nil {
-		panic(err)
-	}
-	return nil
-}
 
-func (c *Client) Disconnect(ctx context.Context) error {
-	c.Conn.Disconnect(ctx)
+	log.Printf("%s index created", idx)
+
 	return nil
 }
